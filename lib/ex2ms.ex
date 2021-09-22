@@ -133,22 +133,27 @@ defmodule Ex2ms do
     [translate_cond(expr, state)]
   end
 
+  @deprecated "^ is no longed used in match conditions and bodies"
+  defp translate_outer_var_deprecated(var) do
+    {:const, {:unquote, [], [{var, [], nil}]}}
+  end
+
   defp translate_cond({var, _, nil}, state) when is_atom(var) do
     if match_var = state.vars[var] do
       :"#{match_var}"
     else
-      raise ArgumentError, message: "variable `#{var}` is unbound in matchspec"
+      {:const, {:unquote, [], [{var, [], nil}]}}
     end
+  end
+
+  defp translate_cond({:^, _, [{var, _, nil}]}, _state) when is_atom(var) do
+    translate_outer_var_deprecated(var)
   end
 
   defp translate_cond({left, right}, state), do: translate_cond({:{}, [], [left, right]}, state)
 
   defp translate_cond({:{}, _, list}, state) when is_list(list) do
     {list |> Enum.map(&translate_cond(&1, state)) |> List.to_tuple()}
-  end
-
-  defp translate_cond({:^, _, [var]}, _state) do
-    {:const, {:unquote, [], [var]}}
   end
 
   defp translate_cond(fun_call = {fun, _, args}, state) when is_atom(fun) and is_list(args) do
@@ -259,8 +264,9 @@ defmodule Ex2ms do
     {List.to_tuple(list), state}
   end
 
-  defp do_translate_param({:^, _, [var]}, state) do
-    {{:unquote, [], [var]}, state}
+  defp do_translate_param({:^, _, [{var, _, nil}]}, state) when is_atom(var) do
+    ms = {:unquote, [], [{var, [], nil}]}
+    {ms, state}
   end
 
   defp do_translate_param(list, state) when is_list(list) do
